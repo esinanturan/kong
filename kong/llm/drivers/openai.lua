@@ -35,12 +35,12 @@ local transformers_to = {
 }
 
 local transformers_from = {
-  ["llm/v1/chat"] = function(response_string, model_info)
+  ["llm/v1/chat"] = function(response_string, _)
     local response_object, err = cjson.decode(response_string)
     if err then
-      return nil, "'choices' not in llm/v1/chat response"
+      return nil, "failed to decode llm/v1/chat response"
     end
-    
+
     if response_object.choices then
       return response_string, nil
     else
@@ -48,10 +48,10 @@ local transformers_from = {
     end
   end,
 
-  ["llm/v1/completions"] = function(response_string, model_info)
+  ["llm/v1/completions"] = function(response_string, _)
     local response_object, err = cjson.decode(response_string)
     if err then
-      return nil, "'choices' not in llm/v1/completions response"
+      return nil, "failed to decode llm/v1/completions response"
     end
 
     if response_object.choices then
@@ -72,7 +72,7 @@ function _M.from_format(response_string, model_info, route_type)
   if not transformers_from[route_type] then
     return nil, fmt("no transformer available from format %s://%s", model_info.provider, route_type)
   end
-  
+
   local ok, response_string, err = pcall(transformers_from[route_type], response_string, model_info)
   if not ok or err then
     return nil, fmt("transformation failed from type %s://%s: %s",
@@ -191,19 +191,14 @@ function _M.configure_request(conf)
   if (conf.model.options and conf.model.options.upstream_url) then
     parsed_url = socket_url.parse(conf.model.options.upstream_url)
   else
-    local path = conf.model.options
-             and conf.model.options.upstream_path
-             or ai_shared.operation_map[DRIVER_NAME][conf.route_type]
-             and ai_shared.operation_map[DRIVER_NAME][conf.route_type].path
-             or "/"
-    if not path then
-      return nil, fmt("operation %s is not supported for openai provider", conf.route_type)
-    end
-
     parsed_url = socket_url.parse(ai_shared.upstream_url_format[DRIVER_NAME])
-    parsed_url.path = path
+    parsed_url.path = (conf.model.options and
+                        conf.model.options.upstream_path)
+                      or (ai_shared.operation_map[DRIVER_NAME][conf.route_type] and
+                        ai_shared.operation_map[DRIVER_NAME][conf.route_type].path)
+                      or "/"
   end
-  
+
   -- if the path is read from a URL capture, ensure that it is valid
   parsed_url.path = string_gsub(parsed_url.path, "^/*", "/")
 

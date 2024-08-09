@@ -24,7 +24,7 @@ lua_shared_dict kong_db_cache_miss          12m;
 lua_shared_dict kong_secrets                5m;
 
 > if not legacy_dns_client then
-lua_shared_dict kong_dns_cache              5m;
+lua_shared_dict kong_dns_cache              ${{RESOLVER_MEM_CACHE_SIZE}};
 > end
 
 underscores_in_headers on;
@@ -592,7 +592,7 @@ server {
 server {
     charset UTF-8;
     server_name kong_worker_events;
-    listen unix:${{PREFIX}}/worker_events.sock;
+    listen unix:${{SOCKET_PATH}}/worker_events.sock;
     access_log off;
     location / {
         content_by_lua_block {

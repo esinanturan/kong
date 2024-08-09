@@ -9,6 +9,7 @@ local string_gsub = string.gsub
 local buffer = require("string.buffer")
 local table_insert = table.insert
 local string_lower = string.lower
+local llm_state = require("kong.llm.state")
 --
 
 -- globals
@@ -123,7 +124,7 @@ local function to_gemini_chat_openai(request_table, model_info, route_type)
         }
       end
     end
-    
+
     new_r.generationConfig = to_gemini_generation_config(request_table)
 
     return new_r, "application/json", nil
@@ -222,7 +223,7 @@ function _M.from_format(response_string, model_info, route_type)
   if not transformers_from[route_type] then
     return nil, fmt("no transformer available from format %s://%s", model_info.provider, route_type)
   end
-  
+
   local ok, response_string, err, metadata = pcall(transformers_from[route_type], response_string, model_info, route_type)
   if not ok or err then
     return nil, fmt("transformation failed from type %s://%s: %s",
@@ -338,7 +339,7 @@ end
 -- returns err or nil
 function _M.configure_request(conf, identity_interface)
   local parsed_url
-  local operation = kong.ctx.shared.ai_proxy_streaming_mode and "streamGenerateContent"
+  local operation = llm_state.is_streaming_mode() and "streamGenerateContent"
                                                              or "generateContent"
   local f_url = conf.model.options and conf.model.options.upstream_url
 

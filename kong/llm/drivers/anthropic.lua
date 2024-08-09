@@ -71,7 +71,7 @@ local function to_claude_prompt(req)
     return kong_messages_to_claude_prompt(req.messages)
 
   end
-  
+
   return nil, "request is missing .prompt and .messages commands"
 end
 
@@ -328,7 +328,7 @@ function _M.from_format(response_string, model_info, route_type)
   if not transform then
     return nil, fmt("no transformer available from format %s://%s", model_info.provider, route_type)
   end
-  
+
   local ok, response_string, err, metadata = pcall(transform, response_string, model_info, route_type)
   if not ok or err then
     return nil, fmt("transformation failed from type %s://%s: %s",
@@ -447,15 +447,11 @@ function _M.configure_request(conf)
     parsed_url = socket_url.parse(conf.model.options.upstream_url)
   else
     parsed_url = socket_url.parse(ai_shared.upstream_url_format[DRIVER_NAME])
-    parsed_url.path = conf.model.options
-                    and conf.model.options.upstream_path
-                    or ai_shared.operation_map[DRIVER_NAME][conf.route_type]
-                    and ai_shared.operation_map[DRIVER_NAME][conf.route_type].path
-                    or "/"
-
-    if not parsed_url.path then
-      return nil, fmt("operation %s is not supported for anthropic provider", conf.route_type)
-    end
+    parsed_url.path = (conf.model.options and
+                        conf.model.options.upstream_path)
+                      or (ai_shared.operation_map[DRIVER_NAME][conf.route_type] and
+                        ai_shared.operation_map[DRIVER_NAME][conf.route_type].path)
+                      or "/"
   end
 
   -- if the path is read from a URL capture, ensure that it is valid

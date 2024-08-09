@@ -33,7 +33,7 @@ dependencies = {
   "lua-protobuf == 0.5.1",
   "lua-resty-healthcheck == 3.1.0",
   "lua-messagepack == 0.5.4",
-  "lua-resty-aws == 1.5.0",
+  "lua-resty-aws == 1.5.3",
   "lua-resty-openssl == 1.5.0",
   "lua-resty-gcp == 0.0.13",
   "lua-resty-counter == 0.2.1",
@@ -117,6 +117,7 @@ build = {
     ["kong.resty.dns.utils"] = "kong/resty/dns/utils.lua",
 
     ["kong.dns.client"] = "kong/dns/client.lua",
+    ["kong.dns.stats"] = "kong/dns/stats.lua",
     ["kong.dns.utils"] = "kong/dns/utils.lua",
 
     ["kong.resty.ctx"] = "kong/resty/ctx.lua",
@@ -168,6 +169,7 @@ build = {
     ["kong.api.routes.tags"] = "kong/api/routes/tags.lua",
     ["kong.api.routes.targets"] = "kong/api/routes/targets.lua",
     ["kong.api.routes.upstreams"] = "kong/api/routes/upstreams.lua",
+    ["kong.api.routes.dns"] = "kong/api/routes/dns.lua",
 
     ["kong.admin_gui"] = "kong/admin_gui/init.lua",
     ["kong.admin_gui.utils"] = "kong/admin_gui/utils.lua",
@@ -613,8 +615,12 @@ build = {
     ["kong.llm.drivers.anthropic"] = "kong/llm/drivers/anthropic.lua",
     ["kong.llm.drivers.mistral"] = "kong/llm/drivers/mistral.lua",
     ["kong.llm.drivers.llama2"] = "kong/llm/drivers/llama2.lua",
+    ["kong.llm.state"] = "kong/llm/state.lua",
+
     ["kong.llm.drivers.gemini"] = "kong/llm/drivers/gemini.lua",
     ["kong.llm.drivers.bedrock"] = "kong/llm/drivers/bedrock.lua",
+
+    ["kong.llm.proxy.handler"] = "kong/llm/proxy/handler.lua",
 
     ["kong.plugins.ai-prompt-decorator.handler"] = "kong/plugins/ai-prompt-decorator/handler.lua",
     ["kong.plugins.ai-prompt-decorator.schema"]  = "kong/plugins/ai-prompt-decorator/schema.lua",

@@ -1,11 +1,12 @@
 local _M = {}
 
 -- imports
-local cjson      = require("cjson.safe")
-local http       = require("resty.http")
-local fmt        = string.format
-local os         = os
-local parse_url  = require("socket.url").parse
+local cjson     = require("cjson.safe")
+local http      = require("resty.http")
+local fmt       = string.format
+local os        = os
+local parse_url = require("socket.url").parse
+local llm_state = require("kong.llm.state")
 local aws_stream = require("kong.tools.aws_stream")
 --
 
@@ -78,6 +79,7 @@ _M.upstream_url_format = {
   gemini        = "https://generativelanguage.googleapis.com",
   gemini_vertex = "https://%s",
   bedrock       = "https://bedrock-runtime.%s.amazonaws.com",
+  mistral       = "https://api.mistral.ai:443"
 }
 
 _M.operation_map = {
@@ -258,7 +260,7 @@ function _M.frame_to_events(frame, provider)
 
     -- it may start with ',' which is the start of the new frame
     frame = (string.sub(str_ltrim(frame), 1, 1) == "," and string.sub(str_ltrim(frame), 2)) or frame
-    
+
     -- it may end with the array terminator ']' indicating the finished stream
     if string.sub(str_rtrim(frame), -1) == "]" then
       frame = string.sub(str_rtrim(frame), 1, -2)
@@ -341,7 +343,7 @@ function _M.frame_to_events(frame, provider)
       end -- if
     end
   end
-  
+
   return events
 end
 
@@ -445,7 +447,7 @@ function _M.from_ollama(response_string, model_info, route_type)
 
     end
   end
-  
+
   if output and output ~= _M._CONST.SSE_TERMINATOR then
     output, err = cjson.encode(output)
   end
@@ -500,7 +502,7 @@ function _M.resolve_plugin_conf(kong_request, conf)
         if #splitted ~= 2 then
           return nil, "cannot parse expression for field '" .. v .. "'"
         end
-        
+
         -- find the request parameter, with the configured name
         prop_m, err = _M.conf_from_request(kong_request, splitted[1], splitted[2])
         if err then
@@ -524,7 +526,7 @@ function _M.pre_request(conf, request_table)
   local auth_param_name = conf.auth and conf.auth.param_name
   local auth_param_value = conf.auth and conf.auth.param_value
   local auth_param_location = conf.auth and conf.auth.param_location
-  
+
   if auth_param_name and auth_param_value and auth_param_location == "body" and request_table then
     request_table[auth_param_name] = auth_param_value
   end
@@ -547,7 +549,7 @@ function _M.pre_request(conf, request_table)
       kong.log.warn("failed calculating cost for prompt tokens: ", err)
       prompt_tokens = 0
     end
-    kong.ctx.shared.ai_prompt_tokens = (kong.ctx.shared.ai_prompt_tokens or 0) + prompt_tokens
+    llm_state.increase_prompt_tokens_count(prompt_tokens)
   end
 
   local start_time_key = "ai_request_start_time_" .. plugin_name
@@ -586,7 +588,7 @@ function _M.post_request(conf, response_object)
   end
 
   -- check if we already have analytics in this context
-  local request_analytics = kong.ctx.shared.analytics
+  local request_analytics = llm_state.get_request_analytics()
 
   -- create a new structure if not
   if not request_analytics then
@@ -611,12 +613,12 @@ function _M.post_request(conf, response_object)
   if kong.ctx.plugin[start_time_key] then
     local llm_latency = math.floor((ngx.now() - kong.ctx.plugin[start_time_key]) * 1000)
     request_analytics_plugin[log_entry_keys.META_CONTAINER][log_entry_keys.LLM_LATENCY] = llm_latency
-    kong.ctx.shared.ai_request_latency = llm_latency
+    llm_state.set_metrics("e2e_latency", llm_latency)
 
     if response_object.usage and response_object.usage.completion_tokens then
       local time_per_token = math.floor(llm_latency / response_object.usage.completion_tokens)
       request_analytics_plugin[log_entry_keys.USAGE_CONTAINER][log_entry_keys.TIME_PER_TOKEN] = time_per_token
-      kong.ctx.shared.ai_request_time_per_token = time_per_token
+      llm_state.set_metrics("tpot_latency", time_per_token)
     end
   end
 
@@ -657,7 +659,7 @@ function _M.post_request(conf, response_object)
     [log_entry_keys.RESPONSE_BODY] = body_string,
   }
   request_analytics[plugin_name] = request_analytics_plugin
-  kong.ctx.shared.analytics = request_analytics
+  llm_state.set_request_analytics(request_analytics)
 
   if conf.logging and conf.logging.log_statistics then
     -- Log meta data
@@ -679,7 +681,7 @@ function _M.post_request(conf, response_object)
     kong.log.warn("failed calculating cost for response tokens: ", err)
     response_tokens = 0
   end
-  kong.ctx.shared.ai_response_tokens = (kong.ctx.shared.ai_response_tokens or 0) + response_tokens
+  llm_state.increase_response_tokens_count(response_tokens)
 
   return nil
 end
